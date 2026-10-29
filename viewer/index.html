@@ -74,10 +74,21 @@ table.it{width:100%;border-collapse:collapse}
 .it td.d{font-weight:700;color:var(--bad);text-align:right;white-space:nowrap}
 .tag{display:inline-block;padding:1px 6px;border-radius:4px;background:var(--head);font-size:11px;white-space:nowrap}
 .empty{padding:22px;color:var(--muted);text-align:center}
-.drop{max-width:620px;margin:8vh auto;padding:32px;border:2px dashed var(--line);border-radius:12px;background:var(--panel);text-align:center;line-height:1.7}
+.start{max-width:980px;margin:4vh auto;padding:0 16px}
+.start .lead{font-size:15px;text-align:center;margin:0 0 18px}
+.boxes{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.drop{padding:22px;border:2px dashed var(--line);border-radius:12px;background:var(--panel);text-align:center;line-height:1.7;min-height:260px}
+.drop h2{font-size:17px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:12px}
+.center{text-align:center}
+.flist{list-style:none;margin:12px 0 0;padding:0;text-align:left;max-height:240px;overflow:auto}
+.flist li{display:flex;justify-content:space-between;gap:8px;padding:3px 6px;border-bottom:1px solid var(--line2);font-size:12px}
+.flist li.cnt{justify-content:flex-end;color:var(--muted);border:none}
+.flist .x{border:none;background:none;color:var(--muted);font-size:15px;line-height:1}
+.go{display:flex;justify-content:center;align-items:center;gap:12px;margin:20px 0 10px}
+.btn.big{padding:11px 34px;font-size:15px;font-weight:700}
+.btn:disabled{opacity:.4;cursor:default}
 .drop.over{border-color:var(--accent);background:#eef3fe}
-.drop h2{margin-top:0}
-.drop ol{text-align:left;display:inline-block;margin:8px 0 16px}
 .drop code{background:var(--head);padding:1px 5px;border-radius:4px}
 .btn{padding:7px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:6px}
 .btn.ghost{background:var(--panel);color:var(--accent)}
@@ -88,6 +99,7 @@ table.it{width:100%;border-collapse:collapse}
   aside{max-height:160px}
   .split{grid-template-columns:1fr}
   .split .pane{min-height:240px}
+  .boxes{grid-template-columns:1fr}
   header .chips{margin-left:0;flex-wrap:wrap}
   main{grid-template-rows:auto auto auto 6px 50vh;overflow:auto}
   .app{height:auto;min-height:100vh}
@@ -123,28 +135,361 @@ function firstDiffSheet(si) {
   return i < 0 ? 0 : i;
 }
 
-// ---------------------------------------------------------------- 결과 파일 불러오기 화면
+// ---------------------------------------------------------------- 브라우저 비교 엔진
+// compare.py 와 같은 규칙을 그대로 옮겼다. 엑셀(xlsx)을 브라우저 안에서 직접 풀어 읽고,
+// 숫자는 엑셀에 저장된 글자를 정수(BigInt)+자릿수로 바꿔 비교하므로 소수점 오차가 없다.
+// 외부 라이브러리·인터넷 없이 동작하며 파일은 어디에도 전송되지 않는다.
+const XL = (() => {
+  const MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+  const RELNS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  const PKG = "http://schemas.openxmlformats.org/package/2006/relationships";
+
+  // ---- zip 풀기 (DecompressionStream 사용)
+  async function unzip(buf) {
+    const dv = new DataView(buf), u8 = new Uint8Array(buf);
+    let eocd = -1;
+    for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65557); i--)
+      if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    if (eocd < 0) throw new Error("엑셀(xlsx) 파일이 아닙니다");
+    const count = dv.getUint16(eocd + 10, true);
+    let p = dv.getUint32(eocd + 16, true);
+    const td = new TextDecoder("utf-8"), entries = {};
+    for (let k = 0; k < count; k++) {
+      if (dv.getUint32(p, true) !== 0x02014b50) break;
+      const method = dv.getUint16(p + 10, true), size = dv.getUint32(p + 20, true);
+      const nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true);
+      const off = dv.getUint32(p + 42, true);
+      entries[td.decode(u8.subarray(p + 46, p + 46 + nl))] = { method, size, off };
+      p += 46 + nl + el + cl;
+    }
+    return {
+      has: n => n in entries,
+      async text(n) {
+        const e = entries[n];
+        const start = e.off + 30 + dv.getUint16(e.off + 26, true) + dv.getUint16(e.off + 28, true);
+        const raw = u8.subarray(start, start + e.size);
+        if (e.method === 0) return td.decode(raw);
+        const ds = new Blob([raw]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+        return td.decode(await new Response(ds).arrayBuffer());
+      },
+    };
+  }
+  const xml = s => new DOMParser().parseFromString(s, "application/xml");
+  const kids = (el, name, ns = MAIN) => Array.from(el.children).filter(c => c.localName === name && c.namespaceURI === ns);
+  const kid = (el, name) => kids(el, name)[0] || null;
+  function textOf(el) {  // <si>/<is> 글자. 윗주(rPh)는 제외
+    let s = "";
+    for (const t of el.getElementsByTagNameNS(MAIN, "t")) {
+      let up = t.parentElement, inRph = false;
+      while (up && up !== el) { if (up.localName === "rPh") { inRph = true; break; } up = up.parentElement; }
+      if (!inRph) s += t.textContent;
+    }
+    return s;
+  }
+  function normPath(p) {
+    const out = [];
+    for (const seg of p.split("/")) { if (seg === "..") out.pop(); else if (seg && seg !== ".") out.push(seg); }
+    return out.join("/");
+  }
+  const colToNum = l => [...l].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
+  function parseRef(ref) { const m = /^\$?([A-Z]+)\$?(\d+)$/.exec(ref.toUpperCase()); return [+m[2], colToNum(m[1])]; }
+
+  async function readXlsx(buf) {
+    const z = await unzip(buf);
+    const rels = {};
+    if (z.has("xl/_rels/workbook.xml.rels"))
+      for (const r of xml(await z.text("xl/_rels/workbook.xml.rels")).getElementsByTagNameNS(PKG, "Relationship")) {
+        const t = r.getAttribute("Target");
+        rels[r.getAttribute("Id")] = t.startsWith("/") ? t.slice(1) : normPath("xl/" + t);
+      }
+    const shared = [];
+    if (z.has("xl/sharedStrings.xml"))
+      for (const si of kids(xml(await z.text("xl/sharedStrings.xml")).documentElement, "si")) shared.push(textOf(si));
+    const sheets = [];
+    const wb = xml(await z.text("xl/workbook.xml"));
+    for (const sh of wb.getElementsByTagNameNS(MAIN, "sheet")) {
+      const target = rels[sh.getAttributeNS(RELNS, "id")];
+      if (!target || !z.has(target)) continue;
+      sheets.push(readSheet(sh.getAttribute("name"), xml(await z.text(target)).documentElement, shared));
+    }
+    return sheets;
+  }
+  function readSheet(name, root, shared) {
+    const cells = new Map(); let maxR = 0, maxC = 0;
+    const sd = kid(root, "sheetData");
+    for (const row of sd ? kids(sd, "row") : []) for (const c of kids(row, "c")) {
+      const ref = c.getAttribute("r"); if (!ref) continue;
+      const [r, col] = parseRef(ref);
+      const t = c.getAttribute("t") || "n", v = kid(c, "v"), f = kid(c, "f");
+      let val = null;
+      if (t === "s") { if (v && v.textContent !== "") val = ["s", shared[parseInt(v.textContent, 10)]]; }
+      else if (t === "inlineStr") { const is = kid(c, "is"); if (is) val = ["s", textOf(is)]; }
+      else if (t === "str") { if (v) val = ["s", v.textContent]; }
+      else if (t === "b") { if (v) val = ["b", v.textContent === "1" ? "TRUE" : "FALSE"]; }
+      else if (t === "e") { if (v) val = ["e", v.textContent]; }
+      else if (v && v.textContent.trim() !== "") val = ["n", v.textContent.trim()];
+      if (!val && f) val = ["f", "=" + f.textContent];
+      if (!val || (val[0] === "s" && val[1] === "")) continue;
+      cells.set(r + "," + col, val);
+      maxR = Math.max(maxR, r); maxC = Math.max(maxC, col);
+    }
+    const merges = [];
+    const mcs = kid(root, "mergeCells");
+    for (const mc of mcs ? kids(mcs, "mergeCell") : []) {
+      const [a, b] = mc.getAttribute("ref").split(":");
+      const [r1, c1] = parseRef(a), [r2, c2] = parseRef(b || a);
+      merges.push([r1, c1, r2, c2]); maxR = Math.max(maxR, r2); maxC = Math.max(maxC, c2);
+    }
+    const widths = {};
+    const cols = kid(root, "cols");
+    for (const col of cols ? kids(cols, "col") : []) {
+      const w = col.getAttribute("width");
+      if (w) for (let i = +col.getAttribute("min"); i <= Math.min(+col.getAttribute("max"), 200); i++) widths[i] = parseFloat(w);
+    }
+    return { name, cells, merges, maxR, maxC, widths };
+  }
+
+  // ---- 정확한 소수: {n: BigInt, s: 소수 자릿수}
+  function dec(str) {
+    const m = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(str);
+    if (!m || (m[2] + (m[3] || "")) === "") return null;
+    const frac = m[3] || "";
+    let n = BigInt((m[2] + frac) || "0");
+    if (m[1] === "-") n = -n;
+    return { n, s: frac.length - parseInt(m[4] || "0", 10) };
+  }
+  const P10 = k => 10n ** BigInt(k);
+  function align(a, b) { const s = Math.max(a.s, b.s); return [a.n * P10(s - a.s), b.n * P10(s - b.s), s]; }
+  const decEq = (a, b) => { const [x, y] = align(a, b); return x === y; };
+  const decSub = (b, a) => { const [x, y, s] = align(b, a); return { n: x - y, s }; };
+  function decFmt(d) {
+    let { n, s } = d;
+    if (s <= 0) return (n * P10(-s)).toString();
+    while (s > 0 && n % 10n === 0n) { n /= 10n; s--; }
+    if (s === 0) return n.toString();
+    const neg = n < 0n, digits = (neg ? -n : n).toString().padStart(s + 1, "0");
+    return (neg ? "-" : "") + digits.slice(0, -s) + "." + digits.slice(-s);
+  }
+  const isInt = d => decFmt(d).indexOf(".") < 0;
+
+  // ---- compare.py 와 같은 규칙
+  const NUM_TEXT = /^[+-]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?$/;
+  const normText = s => s.normalize("NFC").replace(/\s+/g, " ").trim();
+  function classify(cell) {
+    if (!cell) return ["empty", null];
+    const [kind, raw] = cell;
+    if (kind === "n") { const d = dec(raw); return d ? ["num", d] : ["text", raw]; }
+    if (kind === "s") {
+      const t = normText(raw);
+      if (t === "") return ["empty", null];
+      if (NUM_TEXT.test(t)) return ["num", dec(t.replace(/,/g, ""))];
+      return ["text", t];
+    }
+    return [kind, raw];
+  }
+  function display(cell) {
+    if (!cell) return "";
+    if (cell[0] === "n") { const d = dec(cell[1]); return d ? decFmt(d) : cell[1]; }
+    return cell[1];
+  }
+  const T = { NUM: "숫자 다름", BLANK: "한쪽만 값 있음", TEXT: "글자 다름", KIND: "형식 다름", SHEET: "시트 없음" };
+  function compareCells(a, b) {
+    const [ka, va] = classify(a), [kb, vb] = classify(b);
+    if (ka === "empty" && kb === "empty") return null;
+    if (ka === "num" && kb === "num") return decEq(va, vb) ? null : [T.NUM, decSub(vb, va)];
+    if (ka === "empty" || kb === "empty") return [T.BLANK, null];
+    if (ka === kb) return va === vb ? null : [T.TEXT, null];
+    return [T.KIND, null];
+  }
+  const sheetKey = name => { const m = /^\s*([IVX]+-\d+)\s*\./.exec(name); return m ? m[1] : normText(name); };
+  function mergeOwner(sh) {
+    const o = new Map();
+    for (const [r1, c1, r2, c2] of sh.merges) for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) o.set(r + "," + c, r1 + "," + c1);
+    return o;
+  }
+  function labelAt(sh, owner, r, c) {
+    const k = r + "," + c, [kind, v] = classify(sh.cells.get(owner.get(k) || k));
+    return kind === "text" ? v : null;
+  }
+  function labelsFor(sh, owner, r, c) {
+    const rp = [], cp = [];
+    for (let cc = 1; cc < c; cc++) { const t = labelAt(sh, owner, r, cc); if (t && rp[rp.length - 1] !== t) rp.push(t); }
+    for (let rr = 1; rr < r; rr++) { const t = labelAt(sh, owner, rr, c); if (t && cp[cp.length - 1] !== t) cp.push(t); }
+    return [rp.join(" > "), cp.join(" > ")];
+  }
+  function pack(sh) {
+    if (!sh) return null;
+    const cells = {}, kinds = {}, widths = {};
+    for (const [k, v] of sh.cells) { cells[k] = display(v); if (v[0] !== "n") kinds[k] = v[0]; }
+    for (const k in sh.widths) if (+k <= sh.maxC) widths[k] = sh.widths[k];
+    return { maxR: sh.maxR, maxC: sh.maxC, cells, kinds, merges: sh.merges.map(m => m.slice()), widths };
+  }
+  const colName = n => { let s = ""; while (n) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); } return s; };
+  const fmtDelta = d => { const s = decFmt(d); return s.startsWith("-") ? s : "+" + s; };
+
+  function compareBooks(L, R) {
+    const left = new Map(), right = new Map();
+    for (const s of L) if (!left.has(sheetKey(s.name))) left.set(sheetKey(s.name), s);
+    for (const s of R) if (!right.has(sheetKey(s.name))) right.set(sheetKey(s.name), s);
+    const order = L.map(s => sheetKey(s.name)).concat(R.map(s => sheetKey(s.name)).filter(k => !left.has(k)));
+    return order.map(key => {
+      const a = left.get(key), b = right.get(key);
+      const entry = { key, name: (a || b).name, left: pack(a), right: pack(b), diffs: [] };
+      if (!a || !b) {
+        entry.diffs.push({ r: 1, c: 1, addr: "-", type: T.SHEET, lv: a ? "(있음)" : "", rv: b ? "(있음)" : "", delta: "",
+          rowLabel: "", colLabel: a ? "통계 결과 파일에 시트 없음" : "학교 제출 파일에 시트 없음" });
+        return entry;
+      }
+      const oa = mergeOwner(a), ob = mergeOwner(b);
+      const maxR = Math.max(a.maxR, b.maxR), maxC = Math.max(a.maxC, b.maxC);
+      for (let r = 1; r <= maxR; r++) for (let c = 1; c <= maxC; c++) {
+        const ca = a.cells.get(r + "," + c), cb = b.cells.get(r + "," + c);
+        if (!ca && !cb) continue;
+        const res = compareCells(ca, cb); if (!res) continue;
+        let [rowLabel, colLabel] = labelsFor(a, oa, r, c);
+        if (!rowLabel && !colLabel) [rowLabel, colLabel] = labelsFor(b, ob, r, c);
+        entry.diffs.push({ r, c, addr: colName(c) + r, type: res[0], lv: display(ca), rv: display(cb),
+          delta: res[1] ? fmtDelta(res[1]) : "", rowLabel, colLabel });
+      }
+      return entry;
+    });
+  }
+
+  // ---- 학교 짝짓기 (파일명 속 학교명)
+  const NOISE = ["제출자료 조회", "제출자료조회", "특수교육통계", "제출자료", "비교결과"];
+  const LEVELS = [["초등학교", "초"], ["중학교", "중"], ["고등학교", "고"], ["특수학교", "특"]];
+  function schoolName(fn) {
+    let stem = fn.replace(/\.[^.]*$/, "").normalize("NFC");
+    for (const w of NOISE) stem = stem.split(w).join(" ");
+    stem = stem.replace(/\(.*?\)|\[.*?\]/g, " ").replace(/\d{4,}/g, " ");
+    const parts = stem.split(/[_\-\s]+/).filter(Boolean);
+    for (const p of parts) if (/(초등학교|중학교|고등학교|학교|초|중|고)$/.test(p)) return p;
+    return parts.join("");
+  }
+  function schoolKeys(name) {
+    let k = name.replace(/\s+/g, "");
+    for (const [l, s] of LEVELS) if (k.endsWith(l)) k = k.slice(0, -l.length) + s;
+    return [k, k.replace(/^(서울특별시|서울시|서울)/, "")];
+  }
+  function pairFiles(school, stats) {
+    const used = new Set(), info = new Map(stats.map(f => [f, schoolKeys(schoolName(f.name))]));
+    const pairs = school.map(sf => {
+      const name = schoolName(sf.name), [k1, k2] = schoolKeys(name);
+      const free = stats.filter(f => !used.has(f));
+      let match = null;
+      for (const pick of [q => info.get(q)[0] === k1, q => info.get(q)[1] === k2,
+                          q => info.get(q)[1].endsWith(k2) || k2.endsWith(info.get(q)[1])]) {
+        const c = free.filter(pick);
+        if (c.length === 1) { match = c[0]; break; }
+        if (c.length > 1) break;
+      }
+      if (match) used.add(match);
+      return [name, sf, match];
+    });
+    return [pairs, stats.filter(f => !used.has(f))];
+  }
+
+  async function run(schoolFiles, statsFiles, onProgress) {
+    const byName = (a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0;  // compare.py 의 sorted() 와 같은 순서
+    const [pairs, leftover] = pairFiles([...schoolFiles].sort(byName), [...statsFiles].sort(byName));
+    const schools = [];
+    for (let i = 0; i < pairs.length; i++) {
+      const [name, sf, tf] = pairs[i];
+      onProgress && onProgress(i + 1, pairs.length, name);
+      const item = { name, schoolFile: sf.name, statsFile: tf ? tf.name : "", sheets: [], error: "" };
+      try {
+        if (!tf) item.error = "짝이 되는 통계 결과 파일을 찾지 못했습니다.";
+        else item.sheets = compareBooks(await readXlsx(await sf.arrayBuffer()), await readXlsx(await tf.arrayBuffer()));
+      } catch (e) { item.error = "파일을 읽지 못했습니다: " + e.message; }
+      item.diffCount = item.sheets.reduce((a, s) => a + s.diffs.length, 0);
+      schools.push(item);
+    }
+    for (const tf of leftover)
+      schools.push({ name: schoolName(tf.name), schoolFile: "", statsFile: tf.name, sheets: [], diffCount: 0,
+        error: "짝이 되는 학교 제출 파일을 찾지 못했습니다." });
+    const now = new Date(), p2 = x => String(x).padStart(2, "0");
+    return { title: "특수교육통계 제출자료 비교", version: "1.1.0",
+      generated: `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}`,
+      schools };
+  }
+  return { run, readXlsx, compareBooks, schoolName, dec, decFmt };
+})();
+
+// ---------------------------------------------------------------- 첫 화면: 엑셀 두 종류 첨부
+const picked = { school: [], stats: [] };
 function renderDrop() {
   document.title = "특수교육통계 비교";
   $("#app").innerHTML = `
     <header><h1>특수교육통계 제출자료 비교</h1></header>
-    <div class="drop" id="drop">
-      <h2>비교 결과 파일을 여기에 끌어다 놓으세요</h2>
-      <div>파이썬 비교 프로그램이 만든 <code>비교결과_날짜.json</code> 파일을 열면<br>학교 제출 파일과 통계 결과를 2분할 화면으로 보여줍니다.</div>
-      <ol>
-        <li><code>학교제출</code> 폴더에 학교에서 받은 엑셀을 넣습니다.</li>
-        <li><code>통계결과</code> 폴더에 특수교육통계 프로젝트 결과 엑셀을 넣습니다.</li>
-        <li><code>비교실행.bat</code>을 더블클릭합니다 (또는 <code>python compare.py</code>).</li>
-        <li><code>비교결과</code> 폴더의 <code>.html</code>을 바로 열거나, <code>.json</code>을 이 화면에 놓습니다.</li>
-      </ol>
-      <div><button class="btn" id="pick">결과 파일 선택</button></div>
-      <p style="color:var(--muted);font-size:12px;margin-bottom:0">파일은 이 컴퓨터의 브라우저 안에서만 열리며 어디에도 전송되지 않습니다.</p>
-    </div>`;
-  const drop = $("#drop");
-  $("#pick").onclick = () => $("#file").click();
-  drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
-  drop.ondragleave = () => drop.classList.remove("over");
-  drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); };
+    <div class="start">
+      <p class="lead">두 종류의 엑셀 파일을 각각 넣고 <b>비교 시작</b>을 누르세요. 여러 학교를 한꺼번에 넣으면 파일 이름 속 학교명으로 짝을 짓습니다.</p>
+      <div class="boxes">
+        <div class="drop" data-k="school">
+          <h2>① 학교 제출 엑셀</h2>
+          <div class="sub">나이스 제출자료 조회 파일 (예: 제출자료 조회_서울동답초등학교.xlsx)</div>
+          <button class="btn ghost" data-pick="school">파일 선택</button>
+          <div class="sub">또는 여기로 끌어다 놓기 · 여러 개 가능</div>
+          <ul class="flist" id="list-school"></ul>
+        </div>
+        <div class="drop" data-k="stats">
+          <h2>② 특수교육통계 결과 엑셀</h2>
+          <div class="sub">특수교육통계 프로젝트가 만든 파일 (예: 동답초_특수교육통계_제출자료.xlsx)</div>
+          <button class="btn ghost" data-pick="stats">파일 선택</button>
+          <div class="sub">또는 여기로 끌어다 놓기 · 여러 개 가능</div>
+          <ul class="flist" id="list-stats"></ul>
+        </div>
+      </div>
+      <div class="go">
+        <button class="btn big" id="go">비교 시작</button>
+        <span id="progress" class="sub"></span>
+      </div>
+      <p class="sub center">파일은 이 컴퓨터의 브라우저 안에서만 읽고 비교하며 어디에도 전송되지 않습니다. 인터넷이 없어도 됩니다.<br>
+        파이썬으로 만든 결과(<code>비교결과_날짜.json</code>)가 있으면 <a href="#" id="pickjson">여기서 열기</a></p>
+    </div>
+    <input type="file" id="f-school" accept=".xlsx,.xlsm" multiple hidden>
+    <input type="file" id="f-stats" accept=".xlsx,.xlsm" multiple hidden>`;
+  for (const k of ["school", "stats"]) {
+    const input = $("#f-" + k), box = $(`.drop[data-k=${k}]`);
+    $(`[data-pick=${k}]`).onclick = () => input.click();
+    input.onchange = () => { addFiles(k, input.files); input.value = ""; };
+    box.ondragover = e => { e.preventDefault(); box.classList.add("over"); };
+    box.ondragleave = () => box.classList.remove("over");
+    box.ondrop = e => { e.preventDefault(); box.classList.remove("over"); addFiles(k, e.dataTransfer.files); };
+  }
+  $("#pickjson").onclick = e => { e.preventDefault(); $("#file").click(); };
+  $("#go").onclick = startCompare;
+  renderPicked();
+}
+function addFiles(k, files) {
+  const skipped = [];
+  for (const f of files) {
+    if (!/\.(xlsx|xlsm)$/i.test(f.name) || f.name.startsWith("~$")) { skipped.push(f.name); continue; }
+    picked[k] = picked[k].filter(x => x.name !== f.name).concat(f);
+  }
+  renderPicked();
+  if (skipped.length) alert("엑셀(.xlsx) 파일만 넣을 수 있습니다. .xls(옛 형식)는 엑셀에서 .xlsx로 다시 저장해 주세요.\n\n건너뛴 파일: " + skipped.join(", "));
+}
+function renderPicked() {
+  for (const k of ["school", "stats"]) {
+    $("#list-" + k).innerHTML = picked[k].map((f, i) =>
+      `<li><span>${esc(f.name)}</span><button class="x" data-k="${k}" data-i="${i}" title="빼기">×</button></li>`).join("")
+      + (picked[k].length ? `<li class="cnt">${picked[k].length}개</li>` : "");
+  }
+  document.querySelectorAll(".flist .x").forEach(b => b.onclick = () => { picked[b.dataset.k].splice(+b.dataset.i, 1); renderPicked(); });
+  $("#go").disabled = !(picked.school.length && picked.stats.length);
+}
+async function startCompare() {
+  const go = $("#go"); go.disabled = true;
+  if (typeof DecompressionStream === "undefined") {
+    alert("이 브라우저는 너무 오래되어 엑셀을 직접 읽을 수 없습니다. 크롬이나 엣지 최신판을 써 주세요.");
+    go.disabled = false; return;
+  }
+  try {
+    const data = await XL.run(picked.school, picked.stats, (i, n, name) => { $("#progress").textContent = `비교 중 ${i}/${n} · ${name}`; });
+    loadData(data);
+  } catch (e) {
+    alert("비교하지 못했습니다: " + e.message); go.disabled = false; $("#progress").textContent = "";
+  }
 }
 $("#file").onchange = e => { if (e.target.files[0]) readFile(e.target.files[0]); e.target.value = ""; };
 function readFile(f) {
@@ -154,6 +499,24 @@ function readFile(f) {
     catch (err) { alert("비교 결과 파일(.json)이 아닙니다.\n" + err.message); }
   };
   rd.readAsText(f, "utf-8");
+}
+
+// ---------------------------------------------------------------- 확인필요 목록 CSV 저장
+function downloadCsv() {
+  const q = v => { const s = String(v ?? ""); return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const lines = [["학교", "시트", "셀", "행 제목", "열 제목", "학교 제출 값", "통계 결과 값", "차이(통계-학교)", "유형"]];
+  for (const s of state.data.schools) {
+    if (s.error) lines.push([s.name, "", "", "", "", s.schoolFile, s.statsFile, "", s.error]);
+    for (const sh of s.sheets || []) for (const d of sh.diffs)
+      lines.push([s.name, sh.name, d.addr, d.rowLabel, d.colLabel, d.lv, d.rv, d.delta, d.type]);
+  }
+  const blob = new Blob(["﻿" + lines.map(r => r.map(q).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  // 일부 브라우저는 한글 파일명을 "download"로 바꿔 저장하므로 영문으로 둔다
+  a.download = `check-list_${state.data.generated.replace(/[-: ]/g, "").slice(0, 12)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 // ---------------------------------------------------------------- 전체 화면
@@ -172,7 +535,8 @@ function renderApp() {
         <span class="chip">${n}개교</span>
         <span class="chip ok">일치 ${n - bad}</span>
         <span class="chip bad">확인필요 ${bad}개교 · ${cells}건</span>
-        ${EMBEDDED ? "" : `<button class="btn ghost" id="reopen">다른 결과 열기</button>`}
+        <button class="btn ghost" id="csv">목록 CSV 저장</button>
+        ${EMBEDDED ? "" : `<button class="btn ghost" id="reopen">새로 비교</button>`}
       </div>
     </header>
     <div class="body">
@@ -197,7 +561,8 @@ function renderApp() {
         </div>
       </main>
     </div>`;
-  if ($("#reopen")) $("#reopen").onclick = () => $("#file").click();
+  $("#csv").onclick = downloadCsv;
+  if ($("#reopen")) $("#reopen").onclick = () => { state.data = null; state.rows = null; renderDrop(); };
   $("#q").oninput = e => { state.query = e.target.value.trim(); renderSchools(); };
   $("#scope").onclick = e => { const v = e.target.dataset.v; if (v) { state.scope = v; renderIssues(); } };
   setupResizer();

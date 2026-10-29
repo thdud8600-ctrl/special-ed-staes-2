@@ -30,7 +30,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 from decimal import Decimal, InvalidOperation
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = os.path.join(HERE, "viewer", "index.html")
 
@@ -184,9 +184,10 @@ def norm_text(s):
 
 def to_decimal(s):
     try:
-        return Decimal(s)
+        d = Decimal(s)
     except InvalidOperation:
         return None
+    return d if d.is_finite() else None  # 'NaN', 'Infinity' 같은 글자는 숫자로 보지 않는다
 
 
 def classify(cell):
@@ -212,6 +213,11 @@ def fmt_decimal(d):
     if d == d.to_integral_value():
         return str(d.quantize(Decimal(1)))
     return format(d.normalize(), "f")
+
+
+def fmt_delta(d):
+    s = fmt_decimal(d)
+    return s if s.startswith("-") else "+" + s
 
 
 def display(cell):
@@ -340,8 +346,7 @@ def compare_books(school_sheets, stats_sheets):
                 entry["diffs"].append({
                     "r": r, "c": c, "addr": "%s%d" % (num_to_col(c), r), "type": typ,
                     "lv": display(ca), "rv": display(cb),
-                    "delta": ("%+d" % delta if delta == delta.to_integral_value()
-                              else fmt_decimal(delta)) if delta is not None else "",
+                    "delta": fmt_delta(delta) if delta is not None else "",
                     "rowLabel": row_label, "colLabel": col_label,
                 })
         result.append(entry)
