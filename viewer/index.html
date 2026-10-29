@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>특수교육통계 비교</title>
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --line:#d9dde3; --line2:#eceff3; --ink:#1f2933; --muted:#66727f;
+  --accent:#2563eb; --diff:#ccf2a4; --diff-line:#7cc242; --active:#f59e0b; --head:#f0f2f5;
+  --bad:#d64545; --ok:#2f9e44; --warn:#e8590c;
+  font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-size:13px}
+button{font:inherit;cursor:pointer}
+.app{display:grid;grid-template-rows:auto 1fr;height:100vh}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:16px;margin:0;font-weight:700}
+header .meta{color:var(--muted)}
+header .chips{display:flex;gap:8px;margin-left:auto;align-items:center}
+.chip{padding:3px 10px;border-radius:999px;background:var(--head);font-weight:600}
+.chip.bad{background:#fde8e8;color:var(--bad)} .chip.ok{background:#e6f6ea;color:var(--ok)}
+.body{display:grid;grid-template-columns:230px 1fr;min-height:0}
+aside{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+aside input{margin:10px;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font:inherit}
+.slist{overflow:auto;flex:1}
+.sitem{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:7px 12px;border-left:3px solid transparent;cursor:pointer}
+.sitem:hover{background:var(--bg)}
+.sitem.on{background:#eef3fe;border-left-color:var(--accent);font-weight:700}
+.badge{min-width:22px;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;text-align:center;background:#e6f6ea;color:var(--ok)}
+.badge.bad{background:#fde8e8;color:var(--bad)} .badge.err{background:#fff0e6;color:var(--warn)}
+main{display:grid;grid-template-rows:auto auto 1fr 6px var(--bottom,32%);min-width:0;min-height:0}
+.shead{display:flex;gap:12px;align-items:baseline;padding:10px 14px 6px;flex-wrap:wrap}
+.shead h2{margin:0;font-size:15px}
+.shead .files{color:var(--muted)}
+.tabs{display:flex;gap:4px;padding:0 10px;overflow-x:auto;border-bottom:1px solid var(--line)}
+.tab{flex:0 0 auto;white-space:nowrap;padding:6px 10px;border:1px solid var(--line);border-bottom:none;border-radius:6px 6px 0 0;background:var(--head);color:var(--muted);max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.tab.on{background:var(--panel);color:var(--ink);font-weight:700;position:relative;top:1px}
+.tab .n{display:inline-block;margin-left:5px;padding:0 6px;border-radius:999px;background:var(--bad);color:#fff;font-size:11px}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:6px;min-height:0}
+.pane{display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:6px;min-width:0;min-height:0}
+.pane h3{margin:0;padding:6px 10px;font-size:13px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:baseline}
+.pane h3 small{color:var(--muted);font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scroll{overflow:auto;flex:1;position:relative}
+table.sheet{border-collapse:separate;border-spacing:0;font-size:12px}
+.sheet td,.sheet th{border-right:1px solid var(--line2);border-bottom:1px solid var(--line2);padding:3px 6px;white-space:pre-wrap;vertical-align:middle;min-width:44px}
+.sheet th{background:var(--head);color:var(--muted);font-weight:500;position:sticky;z-index:2}
+.sheet thead th{top:0;text-align:center}
+.sheet tbody th{left:0;text-align:right;z-index:1}
+.sheet thead th.corner{left:0;z-index:3}
+.sheet td.num{text-align:right;font-variant-numeric:tabular-nums}
+.sheet td.txt{text-align:center}
+.sheet td.diff{background:var(--diff);box-shadow:inset 0 0 0 1px var(--diff-line);font-weight:700;cursor:pointer}
+.sheet td.active{box-shadow:inset 0 0 0 2px var(--active);animation:flash 1.2s ease 2}
+@keyframes flash{50%{background:#fff3c4}}
+.missing{padding:30px;color:var(--muted);text-align:center}
+.resizer{cursor:row-resize;background:var(--line);}
+.issues{display:flex;flex-direction:column;background:var(--panel);min-height:0}
+.ibar{display:flex;gap:10px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ibar h3{margin:0;font-size:14px}
+.ibar .seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.ibar .seg button{border:none;background:var(--panel);padding:4px 10px}
+.ibar .seg button.on{background:var(--accent);color:#fff}
+.ibar .hint{color:var(--muted);margin-left:auto}
+.ilist{overflow:auto;flex:1}
+table.it{width:100%;border-collapse:collapse}
+.it th{position:sticky;top:0;background:var(--head);text-align:left;padding:5px 8px;font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap}
+.it td{padding:5px 8px;border-bottom:1px solid var(--line2);vertical-align:top}
+.it tr.row{cursor:pointer}
+.it tr.row:hover td{background:#f3f7ff}
+.it tr.on td{background:#fff6dd}
+.it td.v{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.it td.d{font-weight:700;color:var(--bad);text-align:right;white-space:nowrap}
+.tag{display:inline-block;padding:1px 6px;border-radius:4px;background:var(--head);font-size:11px;white-space:nowrap}
+.empty{padding:22px;color:var(--muted);text-align:center}
+.drop{max-width:620px;margin:8vh auto;padding:32px;border:2px dashed var(--line);border-radius:12px;background:var(--panel);text-align:center;line-height:1.7}
+.drop.over{border-color:var(--accent);background:#eef3fe}
+.drop h2{margin-top:0}
+.drop ol{text-align:left;display:inline-block;margin:8px 0 16px}
+.drop code{background:var(--head);padding:1px 5px;border-radius:4px}
+.btn{padding:7px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:6px}
+.btn.ghost{background:var(--panel);color:var(--accent)}
+.legend{display:inline-flex;align-items:center;gap:5px;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:12px;background:var(--diff);border:1px solid var(--diff-line)}
+@media (max-width:900px){
+  .body{grid-template-columns:1fr}
+  aside{max-height:160px}
+  .split{grid-template-columns:1fr}
+  .split .pane{min-height:240px}
+  header .chips{margin-left:0;flex-wrap:wrap}
+  main{grid-template-rows:auto auto auto 6px 50vh;overflow:auto}
+  .app{height:auto;min-height:100vh}
+}
+@media print{.resizer,aside,header .chips{display:none}}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<input type="file" id="file" accept=".json,application/json" hidden>
+<script>
+// 파이썬(compare.py)이 비교 결과를 아래 자리에 넣는다. 비어 있으면 결과 파일(.json)을 불러오는 화면이 나온다.
+const EMBEDDED = /*__DATA__*/null;
+
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
+const colName = n => { let s = ""; while (n) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); } return s; };
+
+const state = { data: null, school: 0, sheet: 0, scope: "school", type: "all", active: null, query: "" };
+
+function loadData(data) {
+  state.data = data;
+  // 확인필요가 많은 학교부터가 아니라, 받은 순서대로 둔다. 첫 화면은 확인필요가 있는 첫 학교.
+  const first = data.schools.findIndex(s => s.diffCount > 0 || s.error);
+  state.school = first < 0 ? 0 : first;
+  state.sheet = firstDiffSheet(state.school);
+  state.active = null;
+  renderApp();
+}
+function firstDiffSheet(si) {
+  const s = state.data.schools[si];
+  const i = (s.sheets || []).findIndex(sh => sh.diffs.length);
+  return i < 0 ? 0 : i;
+}
+
+// ---------------------------------------------------------------- 결과 파일 불러오기 화면
+function renderDrop() {
+  document.title = "특수교육통계 비교";
+  $("#app").innerHTML = `
+    <header><h1>특수교육통계 제출자료 비교</h1></header>
+    <div class="drop" id="drop">
+      <h2>비교 결과 파일을 여기에 끌어다 놓으세요</h2>
+      <div>파이썬 비교 프로그램이 만든 <code>비교결과_날짜.json</code> 파일을 열면<br>학교 제출 파일과 통계 결과를 2분할 화면으로 보여줍니다.</div>
+      <ol>
+        <li><code>학교제출</code> 폴더에 학교에서 받은 엑셀을 넣습니다.</li>
+        <li><code>통계결과</code> 폴더에 특수교육통계 프로젝트 결과 엑셀을 넣습니다.</li>
+        <li><code>비교실행.bat</code>을 더블클릭합니다 (또는 <code>python compare.py</code>).</li>
+        <li><code>비교결과</code> 폴더의 <code>.html</code>을 바로 열거나, <code>.json</code>을 이 화면에 놓습니다.</li>
+      </ol>
+      <div><button class="btn" id="pick">결과 파일 선택</button></div>
+      <p style="color:var(--muted);font-size:12px;margin-bottom:0">파일은 이 컴퓨터의 브라우저 안에서만 열리며 어디에도 전송되지 않습니다.</p>
+    </div>`;
+  const drop = $("#drop");
+  $("#pick").onclick = () => $("#file").click();
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); };
+}
+$("#file").onchange = e => { if (e.target.files[0]) readFile(e.target.files[0]); e.target.value = ""; };
+function readFile(f) {
+  const rd = new FileReader();
+  rd.onload = () => {
+    try { loadData(JSON.parse(rd.result)); }
+    catch (err) { alert("비교 결과 파일(.json)이 아닙니다.\n" + err.message); }
+  };
+  rd.readAsText(f, "utf-8");
+}
+
+// ---------------------------------------------------------------- 전체 화면
+function renderApp() {
+  const d = state.data;
+  const n = d.schools.length;
+  const bad = d.schools.filter(s => s.diffCount || s.error).length;
+  const cells = d.schools.reduce((a, s) => a + s.diffCount, 0);
+  document.title = d.title || "특수교육통계 비교";
+  $("#app").innerHTML = `
+    <header>
+      <h1>${esc(d.title)}</h1>
+      <span class="meta">${esc(d.generated)} 생성</span>
+      <span class="legend"><i></i>값이 다른 셀</span>
+      <div class="chips">
+        <span class="chip">${n}개교</span>
+        <span class="chip ok">일치 ${n - bad}</span>
+        <span class="chip bad">확인필요 ${bad}개교 · ${cells}건</span>
+        ${EMBEDDED ? "" : `<button class="btn ghost" id="reopen">다른 결과 열기</button>`}
+      </div>
+    </header>
+    <div class="body">
+      <aside>
+        <input id="q" placeholder="학교 검색" value="${esc(state.query)}">
+        <div class="slist" id="slist"></div>
+      </aside>
+      <main id="main">
+        <div class="shead" id="shead"></div>
+        <div class="tabs" id="tabs"></div>
+        <div class="split" id="split"></div>
+        <div class="resizer" id="resizer" title="끌어서 아래 목록 크기 조절"></div>
+        <div class="issues">
+          <div class="ibar">
+            <h3>확인필요사항 <span id="icount"></span></h3>
+            <div class="seg" id="scope">
+              <button data-v="sheet">현재 시트</button><button data-v="school">이 학교 전체</button><button data-v="all">모든 학교</button>
+            </div>
+            <span class="hint">항목을 누르면 해당 셀로 이동 · ↑↓ 키로 다음/이전</span>
+          </div>
+          <div class="ilist" id="ilist"></div>
+        </div>
+      </main>
+    </div>`;
+  if ($("#reopen")) $("#reopen").onclick = () => $("#file").click();
+  $("#q").oninput = e => { state.query = e.target.value.trim(); renderSchools(); };
+  $("#scope").onclick = e => { const v = e.target.dataset.v; if (v) { state.scope = v; renderIssues(); } };
+  setupResizer();
+  renderSchools(); renderSchool();
+}
+
+function renderSchools() {
+  const q = state.query;
+  $("#slist").innerHTML = state.data.schools.map((s, i) => {
+    if (q && !s.name.includes(q) && !s.schoolFile.includes(q) && !s.statsFile.includes(q)) return "";
+    const b = s.error ? `<span class="badge err">!</span>` : s.diffCount ? `<span class="badge bad">${s.diffCount}</span>` : `<span class="badge">일치</span>`;
+    return `<div class="sitem ${i === state.school ? "on" : ""}" data-i="${i}">${esc(s.name)}${b}</div>`;
+  }).join("") || `<div class="empty">검색 결과 없음</div>`;
+  $("#slist").onclick = e => {
+    const el = e.target.closest(".sitem"); if (!el) return;
+    selectSchool(+el.dataset.i);
+  };
+}
+function selectSchool(i) {
+  state.school = i; state.sheet = firstDiffSheet(i); state.active = null;
+  renderSchools(); renderSchool();
+}
+
+function renderSchool() {
+  const s = state.data.schools[state.school];
+  $("#shead").innerHTML = `<h2>${esc(s.name)}</h2>
+    <span class="files">학교 제출: ${esc(s.schoolFile || "없음")} &nbsp;|&nbsp; 통계 결과: ${esc(s.statsFile || "없음")}</span>
+    ${s.error ? `<span class="tag" style="background:#fff0e6;color:var(--warn)">${esc(s.error)}</span>` : ""}`;
+  $("#tabs").innerHTML = (s.sheets || []).map((sh, i) =>
+    `<button class="tab ${i === state.sheet ? "on" : ""}" data-i="${i}" title="${esc(sh.name)}">${esc(tabLabel(sh))}${sh.diffs.length ? `<span class="n">${sh.diffs.length}</span>` : ""}</button>`).join("");
+  $("#tabs").onclick = e => { const t = e.target.closest(".tab"); if (t) { state.sheet = +t.dataset.i; state.active = null; renderSchool(); } };
+  const on = $("#tabs .tab.on"); if (on) on.scrollIntoView({ block: "nearest", inline: "nearest" });
+  renderSplit(); renderIssues();
+}
+
+// 'I-2.  특수학급(순회학급 포함)  학년 및 장애유형별' -> 'I-2 학년 및 장애유형별'
+function tabLabel(sh) {
+  const parts = sh.name.split(/\s{2,}/);
+  return parts.length > 1 ? sh.key + " " + parts[parts.length - 1] : sh.name;
+}
+
+// ---------------------------------------------------------------- 2분할 시트
+function sheetTable(side, pack, diffSet) {
+  if (!pack) return `<div class="missing">이 파일에는 해당 시트가 없습니다.</div>`;
+  const sh = state.data.schools[state.school].sheets[state.sheet];
+  const maxR = Math.max(sh.left ? sh.left.maxR : 0, sh.right ? sh.right.maxR : 0, 1);
+  const maxC = Math.max(sh.left ? sh.left.maxC : 0, sh.right ? sh.right.maxC : 0, 1);
+  const span = {}, hidden = new Set();
+  for (const [r1, c1, r2, c2] of pack.merges) {
+    span[r1 + "," + c1] = [r2 - r1 + 1, c2 - c1 + 1];
+    for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) if (r !== r1 || c !== c1) hidden.add(r + "," + c);
+  }
+  let h = `<table class="sheet"><colgroup><col style="width:38px">`;
+  for (let c = 1; c <= maxC; c++) {
+    const w = pack.widths[c] ? Math.max(56, Math.round(pack.widths[c] * 8)) : 72;
+    h += `<col style="width:${w}px">`;
+  }
+  h += `</colgroup><thead><tr><th class="corner"></th>`;
+  for (let c = 1; c <= maxC; c++) h += `<th>${colName(c)}</th>`;
+  h += `</tr></thead><tbody>`;
+  for (let r = 1; r <= maxR; r++) {
+    h += `<tr><th>${r}</th>`;
+    for (let c = 1; c <= maxC; c++) {
+      const k = r + "," + c;
+      if (hidden.has(k)) continue;
+      const v = pack.cells[k] ?? "";
+      const sp = span[k];
+      const kind = pack.kinds[k] || (v === "" ? "" : "n");
+      const cls = [kind === "n" ? "num" : "txt"];
+      if (diffSet.has(k)) cls.push("diff");
+      h += `<td id="${side}-${r}-${c}" data-k="${k}" class="${cls.join(" ")}"${sp ? ` rowspan="${sp[0]}" colspan="${sp[1]}"` : ""}>${esc(v)}</td>`;
+    }
+    h += `</tr>`;
+  }
+  return h + `</tbody></table>`;
+}
+
+function renderSplit() {
+  const s = state.data.schools[state.school];
+  const sh = (s.sheets || [])[state.sheet];
+  if (!sh) { $("#split").innerHTML = `<div class="pane" style="grid-column:1/-1"><div class="missing">${esc(s.error || "비교할 시트가 없습니다.")}</div></div>`; return; }
+  const diffSet = new Set(sh.diffs.map(d => d.r + "," + d.c));
+  $("#split").innerHTML = `
+    <div class="pane"><h3>학교 제출 <small>${esc(s.schoolFile)}</small></h3><div class="scroll" id="sL">${sheetTable("L", sh.left, diffSet)}</div></div>
+    <div class="pane"><h3>특수교육통계 결과 <small>${esc(s.statsFile)}</small></h3><div class="scroll" id="sR">${sheetTable("R", sh.right, diffSet)}</div></div>`;
+  syncScroll($("#sL"), $("#sR"));
+  $("#split").onclick = e => {
+    const td = e.target.closest("td.diff"); if (!td) return;
+    const [r, c] = td.dataset.k.split(",").map(Number);
+    const idx = sh.diffs.findIndex(d => d.r === r && d.c === c);
+    if (idx >= 0) jump(state.school, state.sheet, idx);
+  };
+  if (state.active) markActive();
+}
+
+let syncing = false;
+function syncScroll(a, b) {
+  const link = (x, y) => x.addEventListener("scroll", () => {
+    if (syncing) return; syncing = true;
+    y.scrollTop = x.scrollTop; y.scrollLeft = x.scrollLeft;
+    requestAnimationFrame(() => { syncing = false; });
+  });
+  link(a, b); link(b, a);
+}
+
+// ---------------------------------------------------------------- 확인필요사항 목록
+function issueRows() {
+  const rows = [];
+  state.data.schools.forEach((s, si) => {
+    if (state.scope !== "all" && si !== state.school) return;
+    if (s.error && state.scope !== "sheet") rows.push({ si, sh: -1, i: -1, err: s.error, s });
+    (s.sheets || []).forEach((sh, shi) => {
+      if (state.scope === "sheet" && shi !== state.sheet) return;
+      sh.diffs.forEach((d, i) => rows.push({ si, sh: shi, i, d, s, sheet: sh }));
+    });
+  });
+  return rows;
+}
+
+function renderIssues() {
+  document.querySelectorAll("#scope button").forEach(b => b.classList.toggle("on", b.dataset.v === state.scope));
+  const rows = issueRows();
+  state.rows = rows;
+  $("#icount").textContent = `${rows.length}건`;
+  if (!rows.length) {
+    $("#ilist").innerHTML = `<div class="empty">${state.scope === "sheet" ? "이 시트는 두 파일의 값이 모두 같습니다." : "확인필요사항이 없습니다. 두 파일의 값이 모두 같습니다."}</div>`;
+    return;
+  }
+  const showSchool = state.scope === "all";
+  let h = `<table class="it"><thead><tr><th>#</th>${showSchool ? "<th>학교</th>" : ""}<th>시트</th><th>셀</th><th>항목(행)</th><th>구분(열)</th><th style="text-align:right">학교 제출</th><th style="text-align:right">통계 결과</th><th style="text-align:right">차이</th><th>유형</th></tr></thead><tbody>`;
+  rows.forEach((x, n) => {
+    if (x.err) {
+      h += `<tr><td>${n + 1}</td>${showSchool ? `<td>${esc(x.s.name)}</td>` : ""}<td colspan="8"><span class="tag" style="color:var(--warn)">${esc(x.err)}</span></td></tr>`;
+      return;
+    }
+    const a = state.active, on = a && a.si === x.si && a.sh === x.sh && a.i === x.i;
+    const d = x.d;
+    h += `<tr class="row ${on ? "on" : ""}" data-n="${n}"><td>${n + 1}</td>${showSchool ? `<td>${esc(x.s.name)}</td>` : ""}
+      <td title="${esc(x.sheet.name)}">${esc(x.sheet.key)}</td><td>${esc(d.addr)}</td>
+      <td>${esc(d.rowLabel)}</td><td>${esc(d.colLabel)}</td>
+      <td class="v">${esc(d.lv) || "(빈칸)"}</td><td class="v">${esc(d.rv) || "(빈칸)"}</td>
+      <td class="d">${esc(d.delta)}</td><td><span class="tag">${esc(d.type)}</span></td></tr>`;
+  });
+  $("#ilist").innerHTML = h + `</tbody></table>`;
+  $("#ilist").onclick = e => {
+    const tr = e.target.closest("tr.row"); if (!tr) return;
+    const x = state.rows[+tr.dataset.n];
+    jump(x.si, x.sh, x.i);
+  };
+  const on = $("#ilist tr.on"); if (on) on.scrollIntoView({ block: "nearest" });
+}
+
+function jump(si, shi, i) {
+  const changed = si !== state.school || shi !== state.sheet;
+  state.active = { si, sh: shi, i };
+  if (si !== state.school) { state.school = si; renderSchools(); }
+  state.sheet = shi;
+  if (changed) renderSchool(); else { renderIssues(); markActive(); }
+}
+
+function markActive() {
+  document.querySelectorAll("td.active").forEach(el => el.classList.remove("active"));
+  const a = state.active; if (!a) return;
+  const sh = state.data.schools[a.si].sheets[a.sh];
+  const d = sh.diffs[a.i];
+  syncing = true;
+  for (const side of ["L", "R"]) {
+    const box = $("#s" + side);
+    const el = document.getElementById(`${side}-${d.r}-${d.c}`) || coveringCell(side, sh, d);
+    if (!box || !el) continue;
+    el.classList.remove("active"); void el.offsetWidth; el.classList.add("active");
+    const bt = box.getBoundingClientRect(), et = el.getBoundingClientRect();
+    box.scrollTop += (et.top - bt.top) - (box.clientHeight - el.offsetHeight) / 2;
+    box.scrollLeft += (et.left - bt.left) - (box.clientWidth - el.offsetWidth) / 2;
+  }
+  requestAnimationFrame(() => { syncing = false; });
+}
+function coveringCell(side, sh, d) {
+  const pack = side === "L" ? sh.left : sh.right; if (!pack) return null;
+  for (const [r1, c1, r2, c2] of pack.merges)
+    if (d.r >= r1 && d.r <= r2 && d.c >= c1 && d.c <= c2) return document.getElementById(`${side}-${r1}-${c1}`);
+  return null;
+}
+
+document.addEventListener("keydown", e => {
+  if (!state.data || !state.rows || e.target.tagName === "INPUT") return;
+  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+  const rows = state.rows.filter(x => !x.err); if (!rows.length) return;
+  e.preventDefault();
+  const a = state.active;
+  let n = a ? rows.findIndex(x => x.si === a.si && x.sh === a.sh && x.i === a.i) : -1;
+  n = e.key === "ArrowDown" ? Math.min(rows.length - 1, n + 1) : Math.max(0, n - 1);
+  jump(rows[n].si, rows[n].sh, rows[n].i);
+});
+
+function setupResizer() {
+  const main = $("#main"), bar = $("#resizer");
+  bar.onmousedown = e => {
+    e.preventDefault();
+    const move = ev => {
+      const r = main.getBoundingClientRect();
+      const h = Math.min(r.height - 160, Math.max(80, r.bottom - ev.clientY));
+      main.style.setProperty("--bottom", h + "px");
+    };
+    const up = () => { document.removeEventListener("mousemove", move); document.removeEventListener("mouseup", up); };
+    document.addEventListener("mousemove", move); document.addEventListener("mouseup", up);
+  };
+}
+
+if (EMBEDDED) loadData(EMBEDDED); else renderDrop();
+</script>
+</body>
+</html>
