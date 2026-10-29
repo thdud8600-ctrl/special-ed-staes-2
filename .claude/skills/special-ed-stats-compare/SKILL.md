@@ -6,7 +6,7 @@ description: 학교가 제출한 특수교육통계 엑셀(나이스 제출자�
 # 특수교육통계 제출자료 비교
 
 학교 제출 엑셀과 특수교육통계 프로젝트 결과 엑셀(학교당 1개, 보통 42~43개교)을 비교한다.
-저장소: `special-ed-staes-2` (compare.py, viewer/index.html).
+저장소: `special-ed-staes-2` (compare.py, viewer/index.html). 이 저장소를 연 Claude Code 에서는 이 스킬이 자동으로 잡힌다.
 
 ## 원칙
 - 두 파일에 들어 있는 값만 비교한다. 다른 자료를 더하거나 값을 추정·보정하지 않는다.

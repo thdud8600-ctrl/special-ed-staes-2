@@ -74,6 +74,11 @@ python compare.py --pair 학교파일.xlsx 통계파일.xlsx  # 한 학교만
 
 `학교제출`, `통계결과`, `비교결과` 폴더의 내용은 `.gitignore`로 저장소에 올라가지 않습니다.
 
+## 스킬
+
+`.claude/skills/special-ed-stats-compare/SKILL.md`에 이 비교 작업의 절차와 규칙을 스킬로 정리해 두었습니다.
+이 저장소를 Claude Code로 열면 스킬이 자동으로 적용됩니다.
+
 ## 테스트
 
 ```bash
