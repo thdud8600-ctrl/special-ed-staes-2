@@ -113,6 +113,7 @@ table.it{width:100%;border-collapse:collapse}
 <script>
 // 파이썬(compare.py)이 비교 결과를 아래 자리에 넣는다. 비어 있으면 결과 파일(.json)을 불러오는 화면이 나온다.
 const EMBEDDED = /*__DATA__*/null;
+const APP_VERSION = "1.2.1";  // 화면에 표시해 최신판인지 확인할 수 있게 한다
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
@@ -412,7 +413,7 @@ const XL = (() => {
       schools.push({ name: schoolName(tf.name), schoolFile: "", statsFile: tf.name, sheets: [], diffCount: 0,
         error: "짝이 되는 학교 제출 파일을 찾지 못했습니다." });
     const now = new Date(), p2 = x => String(x).padStart(2, "0");
-    return { title: "특수교육통계 제출자료 비교", version: "1.2.0",
+    return { title: "특수교육통계 제출자료 비교", version: APP_VERSION,
       generated: `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}`,
       schools };
   }
@@ -424,7 +425,7 @@ const picked = { school: [], stats: [] };
 function renderDrop() {
   document.title = "특수교육통계 비교";
   $("#app").innerHTML = `
-    <header><h1>특수교육통계 제출자료 비교</h1></header>
+    <header><h1>특수교육통계 제출자료 비교</h1><span class="meta">v${APP_VERSION} · 빈칸과 0은 같은 값으로 봄</span></header>
     <div class="start">
       <p class="lead">두 종류의 엑셀 파일을 각각 넣고 <b>비교 시작</b>을 누르세요. 여러 학교를 한꺼번에 넣으면 파일 이름 속 학교명으로 짝을 짓습니다.</p>
       <div class="boxes">
@@ -533,7 +534,7 @@ function renderApp() {
   $("#app").innerHTML = `
     <header>
       <h1>${esc(d.title)}</h1>
-      <span class="meta">${esc(d.generated)} 생성</span>
+      <span class="meta">${esc(d.generated)} 생성 · v${esc(d.version || APP_VERSION)}</span>
       <span class="legend"><i></i>값이 다른 셀</span>
       <div class="chips">
         <span class="chip">${n}개교</span>

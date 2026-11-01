@@ -30,7 +30,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 from decimal import Decimal, InvalidOperation
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = os.path.join(HERE, "viewer", "index.html")
 
