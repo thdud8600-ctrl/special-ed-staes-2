@@ -30,7 +30,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 from decimal import Decimal, InvalidOperation
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = os.path.join(HERE, "viewer", "index.html")
 
@@ -279,6 +279,9 @@ def compare_cells(a, b):
     if ka == "num" and kb == "num":
         return None if va == vb else (TYPE_NUM, vb - va)
     if ka == "empty" or kb == "empty":
+        other = vb if ka == "empty" else va
+        if (kb if ka == "empty" else ka) == "num" and other == 0:
+            return None  # 빈칸과 0은 같은 값으로 본다
         return (TYPE_BLANK, None)
     if ka == kb:
         return None if va == vb else (TYPE_TEXT, None)

@@ -297,7 +297,11 @@ const XL = (() => {
     const [ka, va] = classify(a), [kb, vb] = classify(b);
     if (ka === "empty" && kb === "empty") return null;
     if (ka === "num" && kb === "num") return decEq(va, vb) ? null : [T.NUM, decSub(vb, va)];
-    if (ka === "empty" || kb === "empty") return [T.BLANK, null];
+    if (ka === "empty" || kb === "empty") {
+      const [k, v] = ka === "empty" ? [kb, vb] : [ka, va];
+      if (k === "num" && v.n === 0n) return null;  // 빈칸과 0은 같은 값으로 본다
+      return [T.BLANK, null];
+    }
     if (ka === kb) return va === vb ? null : [T.TEXT, null];
     return [T.KIND, null];
   }
@@ -408,7 +412,7 @@ const XL = (() => {
       schools.push({ name: schoolName(tf.name), schoolFile: "", statsFile: tf.name, sheets: [], diffCount: 0,
         error: "짝이 되는 학교 제출 파일을 찾지 못했습니다." });
     const now = new Date(), p2 = x => String(x).padStart(2, "0");
-    return { title: "특수교육통계 제출자료 비교", version: "1.1.0",
+    return { title: "특수교육통계 제출자료 비교", version: "1.2.0",
       generated: `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())} ${p2(now.getHours())}:${p2(now.getMinutes())}`,
       schools };
   }

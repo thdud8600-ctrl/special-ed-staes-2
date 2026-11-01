@@ -53,8 +53,11 @@ class CellCompare(unittest.TestCase):
         self.assertEqual(compare.compare_cells(("n", "7.0"), ("n", "9"))[1], Decimal(2))
         self.assertEqual(compare.compare_cells(("n", "0.3"), ("n", "0.30000000000000004"))[0], compare.TYPE_NUM)
 
-    def test_blank_vs_zero_is_flagged(self):
-        self.assertEqual(compare.compare_cells(None, ("n", "0"))[0], compare.TYPE_BLANK)
+    def test_blank_vs_zero_is_same(self):
+        self.assertIsNone(compare.compare_cells(None, ("n", "0")))
+        self.assertIsNone(compare.compare_cells(("n", "0.0"), ("s", " ")))
+        self.assertIsNone(compare.compare_cells(None, ("s", "0")))
+        self.assertEqual(compare.compare_cells(None, ("n", "2"))[0], compare.TYPE_BLANK)
 
     def test_text_whitespace_ignored(self):
         self.assertIsNone(compare.compare_cells(("s", "장애\r\n유형"), ("s", "장애 유형")))
