@@ -113,7 +113,7 @@ table.it{width:100%;border-collapse:collapse}
 <script>
 // 파이썬(compare.py)이 비교 결과를 아래 자리에 넣는다. 비어 있으면 결과 파일(.json)을 불러오는 화면이 나온다.
 const EMBEDDED = /*__DATA__*/null;
-const APP_VERSION = "1.2.1";  // 화면에 표시해 최신판인지 확인할 수 있게 한다
+const APP_VERSION = "1.3.0";  // 화면에 표시해 최신판인지 확인할 수 있게 한다
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
@@ -185,8 +185,10 @@ const XL = (() => {
       while (up && up !== el) { if (up.localName === "rPh") { inRph = true; break; } up = up.parentElement; }
       if (!inRph) s += t.textContent;
     }
-    return s;
+    return unescapeX(s);
   }
+  // 엑셀이 줄바꿈 등을 '_x000D_' 처럼 적어 둔 것을 원래 글자로 되돌린다
+  const unescapeX = s => s.replace(/_x([0-9A-Fa-f]{4})_/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
   function normPath(p) {
     const out = [];
     for (const seg of p.split("/")) { if (seg === "..") out.pop(); else if (seg && seg !== ".") out.push(seg); }
@@ -225,7 +227,7 @@ const XL = (() => {
       let val = null;
       if (t === "s") { if (v && v.textContent !== "") val = ["s", shared[parseInt(v.textContent, 10)]]; }
       else if (t === "inlineStr") { const is = kid(c, "is"); if (is) val = ["s", textOf(is)]; }
-      else if (t === "str") { if (v) val = ["s", v.textContent]; }
+      else if (t === "str") { if (v) val = ["s", unescapeX(v.textContent)]; }
       else if (t === "b") { if (v) val = ["b", v.textContent === "1" ? "TRUE" : "FALSE"]; }
       else if (t === "e") { if (v) val = ["e", v.textContent]; }
       else if (v && v.textContent.trim() !== "") val = ["n", v.textContent.trim()];
@@ -298,12 +300,12 @@ const XL = (() => {
     const [ka, va] = classify(a), [kb, vb] = classify(b);
     if (ka === "empty" && kb === "empty") return null;
     if (ka === "num" && kb === "num") return decEq(va, vb) ? null : [T.NUM, decSub(vb, va)];
+    if (ka !== "num" && kb !== "num") return null;  // 제목 같은 글자끼리의 차이(예: '장애_x000D_유형')는 표시하지 않는다
     if (ka === "empty" || kb === "empty") {
-      const [k, v] = ka === "empty" ? [kb, vb] : [ka, va];
-      if (k === "num" && v.n === 0n) return null;  // 빈칸과 0은 같은 값으로 본다
+      const v = ka === "empty" ? vb : va;
+      if (v.n === 0n) return null;  // 빈칸과 0은 같은 값으로 본다
       return [T.BLANK, null];
     }
-    if (ka === kb) return va === vb ? null : [T.TEXT, null];
     return [T.KIND, null];
   }
   const sheetKey = name => { const m = /^\s*([IVX]+-\d+)\s*\./.exec(name); return m ? m[1] : normText(name); };
@@ -425,7 +427,7 @@ const picked = { school: [], stats: [] };
 function renderDrop() {
   document.title = "특수교육통계 비교";
   $("#app").innerHTML = `
-    <header><h1>특수교육통계 제출자료 비교</h1><span class="meta">v${APP_VERSION} · 빈칸과 0은 같은 값으로 봄</span></header>
+    <header><h1>특수교육통계 제출자료 비교</h1><span class="meta">v${APP_VERSION} · 숫자만 비교 (빈칸=0, 글자 차이 무시)</span></header>
     <div class="start">
       <p class="lead">두 종류의 엑셀 파일을 각각 넣고 <b>비교 시작</b>을 누르세요. 여러 학교를 한꺼번에 넣으면 파일 이름 속 학교명으로 짝을 짓습니다.</p>
       <div class="boxes">

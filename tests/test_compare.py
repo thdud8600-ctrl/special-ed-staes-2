@@ -61,7 +61,14 @@ class CellCompare(unittest.TestCase):
 
     def test_text_whitespace_ignored(self):
         self.assertIsNone(compare.compare_cells(("s", "장애\r\n유형"), ("s", "장애 유형")))
-        self.assertEqual(compare.compare_cells(("s", "총계"), ("s", "합계"))[0], compare.TYPE_TEXT)
+        # 글자끼리의 차이는 표시하지 않는다 (숫자만 비교)
+        self.assertIsNone(compare.compare_cells(("s", "총계"), ("s", "합계")))
+        self.assertIsNone(compare.compare_cells(("s", "장애유형"), None))
+        self.assertEqual(compare.compare_cells(("s", "-"), ("n", "3"))[0], compare.TYPE_KIND)
+
+    def test_x000d_escape(self):
+        self.assertEqual(compare.unescape_x("장애_x000D_\n유형"), "장애\r\n유형")
+        self.assertIsNone(compare.compare_cells(("s", compare.unescape_x("장애_x000D_\n유형")), ("s", "장애\n유형")))
 
 
 class Pairing(unittest.TestCase):

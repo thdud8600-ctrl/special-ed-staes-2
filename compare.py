@@ -30,7 +30,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 from decimal import Decimal, InvalidOperation
 
-VERSION = "1.2.1"
+VERSION = "1.3.0"
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = os.path.join(HERE, "viewer", "index.html")
 
@@ -67,13 +67,21 @@ def parse_ref(ref):
     return int(m.group(2)), col_to_num(m.group(1))
 
 
+_XESC = re.compile(r"_x([0-9A-Fa-f]{4})_")
+
+
+def unescape_x(s):
+    """엑셀이 줄바꿈 등을 '_x000D_' 처럼 적어 둔 것을 원래 글자로 되돌린다."""
+    return _XESC.sub(lambda m: chr(int(m.group(1), 16)), s)
+
+
 def _text_of(el):
     """<si>/<is> 요소의 글자(서식 run 포함)를 이어 붙인다. 윗주(rPh)는 제외."""
     rph = set()
     for r in el.findall(".//m:rPh", NS):
         for t in r.iter("{%s}t" % NS["m"]):
             rph.add(id(t))
-    return "".join(t.text or "" for t in el.iter("{%s}t" % NS["m"]) if id(t) not in rph)
+    return unescape_x("".join(t.text or "" for t in el.iter("{%s}t" % NS["m"]) if id(t) not in rph))
 
 
 def read_xlsx(path):
@@ -135,7 +143,7 @@ def _read_sheet(name, root, shared):
             if is_ is not None:
                 val = ("s", _text_of(is_))
         elif t == "str":
-            val = ("s", v.text or "") if v is not None else None
+            val = ("s", unescape_x(v.text or "")) if v is not None else None
         elif t == "b":
             if v is not None:
                 val = ("b", "TRUE" if v.text == "1" else "FALSE")
@@ -278,13 +286,13 @@ def compare_cells(a, b):
         return None
     if ka == "num" and kb == "num":
         return None if va == vb else (TYPE_NUM, vb - va)
+    if ka != "num" and kb != "num":
+        return None  # 제목 같은 글자끼리의 차이(예: '장애_x000D_유형')는 표시하지 않는다
     if ka == "empty" or kb == "empty":
         other = vb if ka == "empty" else va
-        if (kb if ka == "empty" else ka) == "num" and other == 0:
+        if other == 0:
             return None  # 빈칸과 0은 같은 값으로 본다
         return (TYPE_BLANK, None)
-    if ka == kb:
-        return None if va == vb else (TYPE_TEXT, None)
     return (TYPE_KIND, None)
 
 
