@@ -75,6 +75,13 @@ class Pairing(unittest.TestCase):
     def test_names(self):
         self.assertEqual(compare.school_name_from_file("제출자료 조회_서울동답초등학교.xlsx"), "서울동답초등학교")
         self.assertEqual(compare.school_name_from_file("동답초_특수교육통계_제출자료.xlsx"), "동답초")
+        self.assertEqual(compare.school_name_from_file("제출자료 조회_서울동답초등학교 (1).xlsx"), "서울동답초등학교")
+        self.assertEqual(compare.school_name_from_file("제출자료조회(서울동답초등학교).xlsx"), "서울동답초등학교")
+
+    def test_misplaced(self):
+        s, t, moved = compare.sort_misplaced(["/a/동답초_특수교육통계_제출자료.xlsx"], ["/b/제출자료 조회_서울동답초등학교.xlsx"])
+        self.assertEqual([os.path.basename(x) for x in s], ["제출자료 조회_서울동답초등학교.xlsx"])
+        self.assertEqual(len(moved), 2)
 
     def test_pair(self):
         school = ["/a/제출자료 조회_서울동답초등학교.xlsx", "/a/제출자료 조회_서울가나초등학교.xlsx"]

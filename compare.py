@@ -30,7 +30,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 from decimal import Decimal, InvalidOperation
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = os.path.join(HERE, "viewer", "index.html")
 
@@ -375,7 +375,8 @@ def school_name_from_file(path):
     stem = unicodedata.normalize("NFC", stem)
     for w in _NOISE:
         stem = stem.replace(w, " ")
-    stem = re.sub(r"\(.*?\)|\[.*?\]", " ", stem)
+    stem = re.sub(r"\(\s*\d*\s*\)|\[\s*\d*\s*\]", " ", stem)  # '(1)' 같은 복사본 번호만 지운다
+    stem = re.sub(r"[()\[\]]", " ", stem)
     stem = re.sub(r"\d{4,}", " ", stem)  # 날짜·연도
     parts = [p for p in re.split(r"[_\-\s]+", stem) if p]
     for p in parts:  # 학교급이 들어 있는 조각을 학교명으로
@@ -402,6 +403,31 @@ def list_xlsx(folder):
         if fn.lower().endswith((".xlsx", ".xlsm")):
             out.append(os.path.join(folder, fn))
     return out
+
+
+def guess_kind(path):
+    """파일 이름으로 학교 제출(school)인지 통계 결과(stats)인지 알 수 있으면 알려 준다."""
+    n = unicodedata.normalize("NFC", os.path.basename(path))
+    if "특수교육통계" in n:
+        return "stats"
+    if re.search(r"제출자료\s*조회", n):
+        return "school"
+    return None
+
+
+def sort_misplaced(school_files, stats_files):
+    """잘못된 폴더에 들어간 파일을 이름을 보고 맞는 쪽으로 옮긴다."""
+    s2, t2, moved = [], [], []
+    for p in school_files:
+        (t2 if guess_kind(p) == "stats" else s2).append(p)
+        if guess_kind(p) == "stats":
+            moved.append(p)
+    for p in stats_files:
+        (s2 if guess_kind(p) == "school" else t2).append(p)
+        if guess_kind(p) == "school":
+            moved.append(p)
+    key = lambda p: os.path.basename(p)
+    return sorted(s2, key=key), sorted(t2, key=key), moved
 
 
 def load_mapping(path):
@@ -539,6 +565,9 @@ def main(argv=None):
         if not sf or not tf:
             print("비교할 파일이 없습니다. 학교제출 %d개, 통계결과 %d개" % (len(sf), len(tf)))
             return 1
+        sf, tf, moved = sort_misplaced(sf, tf)
+        for m in moved:
+            print("  다른 폴더 파일로 보고 옮겨 비교합니다: %s" % os.path.basename(m))
         mapping = load_mapping(args.map or os.path.join(args.school, "매칭표.csv"))
         pairs, leftover = pair_files(sf, tf, mapping)
         print("학교 제출 %d개, 통계 결과 %d개를 비교합니다." % (len(sf), len(tf)))
