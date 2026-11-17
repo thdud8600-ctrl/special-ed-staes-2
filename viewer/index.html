@@ -154,7 +154,7 @@ table.it{width:100%;border-collapse:collapse}
 <script>
 // 파이썬(compare.py)이 비교 결과를 아래 자리에 넣는다. 비어 있으면 결과 파일(.json)을 불러오는 화면이 나온다.
 const EMBEDDED = /*__DATA__*/null;
-const APP_VERSION = "1.5.1";  // 화면에 표시해 최신판인지 확인할 수 있게 한다
+const APP_VERSION = "1.5.2";  // 화면에 표시해 최신판인지 확인할 수 있게 한다
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
@@ -508,42 +508,74 @@ const ART = {
       <rect x="1304" y="64" width="58" height="86"/>${W(1317, 80, 2, 2, 22, 30)}
     </svg>`;
   },
-  // 돋보기를 든 학생 (가방 메고). 얼굴·목·몸이 이어지고 발끝이 땅선에 닿는다.
-  student: `<svg viewBox="0 0 220 292" fill="#fff" stroke="#222" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-    <g transform="translate(4 6)"><path d="M18 10h50a12 12 0 0 1 12 12v18a12 12 0 0 1-12 12H40l-12 10 2-10h-12A12 12 0 0 1 6 40V22a12 12 0 0 1 12-12z"/>
-    <text x="43" y="38" text-anchor="middle" font-size="17" font-weight="800" fill="#222" stroke="none" font-family="inherit">앗!</text></g>
-    <rect x="156" y="204" width="34" height="56" rx="10" fill="#f6e97f"/><path d="M158 222h30"/>
-    <path d="M82 292V236c0-30 18-50 42-52h4c24 2 42 22 42 52v56z"/>
-    <path d="M114 164v22h22v-22"/>
-    <path d="M108 186l18 16 16-16" fill="none"/>
-    <path d="M150 192l10 40M98 192l-6 40" fill="none"/>
-    <path d="M126 236v56" fill="none"/>
-    <g transform="translate(0 14)"><circle cx="125" cy="124" r="32"/>
-    <path d="M92 126c-4-30 14-44 34-44 22 0 38 16 32 44-6-12-18-20-32-20-12 6-22 12-34 20z" fill="#222"/>
-    <circle cx="114" cy="130" r="2.6" fill="#222"/><circle cx="136" cy="130" r="2.6" fill="#222"/><path d="M118 144q7 6 14 0" fill="none"/></g>
-    <path d="M90 204c-14-2-24-14-26-32" fill="none" stroke-width="2.6"/>
-    <circle cx="64" cy="168" r="7"/>
-    <path d="M60 162l-6-10" stroke-width="5"/>
-    <circle cx="48" cy="138" r="17" fill="#eef7ff"/><path d="M41 131a9 9 0 0 1 9-4" fill="none"/>
-  </svg>`,
-  // 지시봉을 든 선생님. 얼굴·목·몸이 이어지고 발끝이 땅선에 닿는다.
-  teacher: `<svg viewBox="0 0 220 292" fill="#fff" stroke="#222" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-    <g transform="translate(118 2)"><path d="M14 10h66a12 12 0 0 1 12 12v18a12 12 0 0 1-12 12H58l2 10-12-10H14A12 12 0 0 1 2 40V22a12 12 0 0 1 12-12z"/>
+  // 학생: 교복(흰 셔츠·리본·남색 반바지), 가방, 운동화. 머리·목·상체·팔·하체·다리를 따로 그린다.
+  student: (() => {
+    const limb = (d, fill) => `<path d="${d}" fill="none" stroke="#222" stroke-width="15"/><path d="${d}" fill="none" stroke="${fill}" stroke-width="10"/>`;
+    return `<svg viewBox="0 0 220 340" fill="#fff" stroke="#222" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <g transform="translate(130 4)"><path d="M14 10h50a12 12 0 0 1 12 12v18a12 12 0 0 1-12 12H44l2 10-12-10H14A12 12 0 0 1 2 40V22a12 12 0 0 1 12-12z"/>
+    <text x="39" y="38" text-anchor="middle" font-size="17" font-weight="800" fill="#222" stroke="none" font-family="inherit">앗!</text></g>
+    <!-- 가방 (등 뒤) -->
+    <rect x="138" y="150" width="34" height="62" rx="10" fill="#f6e97f"/><path d="M140 172h30"/>
+    <!-- 다리 + 양말 + 운동화 -->
+    ${limb("M108 256V318", "#fff")}${limb("M132 256V318", "#fff")}
+    <path d="M94 330c0-8 6-12 14-12s12 4 12 12z" fill="#fff"/><path d="M94 330h26" />
+    <path d="M120 330c0-8 6-12 14-12s14 4 14 12z" fill="#fff"/><path d="M120 330h28"/>
+    <path d="M90 338h62" stroke-width="2"/>
+    <!-- 하체: 반바지 -->
+    <path d="M92 226h56l4 36h-26l-6-16-6 16H88z" fill="#5d6f99"/>
+    <!-- 팔 (반팔 아래 맨팔) -->
+    ${limb("M90 160L76 134L66 112", "#fff")}
+    <circle cx="64" cy="108" r="7"/>
+    <path d="M60 102l-6-12" stroke-width="5"/><circle cx="50" cy="76" r="15" fill="#eef7ff"/><path d="M43 70a8 8 0 0 1 8-4" fill="none"/>
+    ${limb("M150 160L156 196L154 216", "#fff")}
+    <circle cx="154" cy="220" r="7"/>
+    <!-- 상체: 흰 셔츠, 반팔 -->
+    <path d="M94 134q26-10 52 0l4 94H90z"/>
+    <path d="M94 134l-12 26 12 6 4-12M146 134l12 26-12 6-4-12" />
+    <path d="M110 130l10 14 10-14" fill="none"/>
+    <path d="M114 146l-8-5v10zM126 146l8-5v10z" fill="#f6e97f"/><circle cx="120" cy="146" r="3" fill="#f6e97f"/>
+    <path d="M140 136l2 50" fill="none"/>
+    <rect x="98" y="160" width="14" height="8" rx="1" fill="#f6e97f" stroke-width="1.6"/>
+    <!-- 목 + 머리 -->
+    <path d="M113 116v16h14v-16"/>
+    <circle cx="120" cy="92" r="27"/>
+    <path d="M93 94c-4-26 12-38 28-38 19 0 33 14 28 38-5-10-15-17-28-17-10 5-19 10-28 17z" fill="#222"/>
+    <circle cx="111" cy="97" r="2.4" fill="#222"/><circle cx="130" cy="97" r="2.4" fill="#222"/><path d="M114 108q6 5 12 0" fill="none"/>
+  </svg>`; })(),
+  // 선생님: 회색 정장 재킷·흰 셔츠·넥타이·긴 바지·구두, 지시봉과 책. 머리·목·상체·팔·하체·다리를 따로 그린다.
+  teacher: (() => {
+    const limb = (d, fill, w = 13) => `<path d="${d}" fill="none" stroke="#222" stroke-width="${w + 5}"/><path d="${d}" fill="none" stroke="${fill}" stroke-width="${w}"/>`;
+    return `<svg viewBox="0 0 220 340" fill="#fff" stroke="#222" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+    <g transform="translate(4 4)"><path d="M14 10h66a12 12 0 0 1 12 12v18a12 12 0 0 1-12 12H38l-12 10 2-10H14A12 12 0 0 1 2 40V22a12 12 0 0 1 12-12z"/>
     <text x="47" y="38" text-anchor="middle" font-size="16" font-weight="800" fill="#222" stroke="none" font-family="inherit">일치!</text></g>
-    <path d="M46 292V236c0-32 22-52 50-54h8c28 2 50 22 50 54v56z"/>
-    <path d="M89 164v20h22v-20"/>
-    <path d="M86 184l14 22 14-22" fill="none"/>
-    <path d="M100 198l-7 12 7 26 7-26z" fill="#f6e97f"/>
-    <path d="M100 236v56" fill="none"/>
-    <g transform="translate(0 14)"><circle cx="100" cy="122" r="32"/>
-    <path d="M68 118c0-24 14-38 34-38s32 14 32 36c-8-6-12-14-14-20-14 10-34 16-52 22z" fill="#222"/>
-    <circle cx="88" cy="128" r="9"/><circle cx="113" cy="128" r="9"/><path d="M97 128h7M68 126h11M122 126h10" fill="none"/>
-    <circle cx="88" cy="128" r="2.2" fill="#222"/><circle cx="113" cy="128" r="2.2" fill="#222"/><path d="M93 146q7 5 14 0" fill="none"/></g>
-    <path d="M146 204c18-6 30-26 34-50" fill="none" stroke-width="2.6"/>
-    <circle cx="181" cy="148" r="8"/>
-    <path d="M185 141l28-48" stroke-width="3.4"/><circle cx="214" cy="91" r="3" fill="#222"/>
-    <path d="M58 212c-6 20-6 40-2 60" fill="none"/>
-  </svg>`,
+    <!-- 다리: 긴 바지 + 구두 -->
+    ${limb("M90 236V322", "#4a4f5a", 16)}${limb("M112 236V322", "#4a4f5a", 16)}
+    <path d="M74 336c0-8 6-12 16-12h8v12z" fill="#222"/><path d="M104 336v-12h8c10 0 16 4 16 12z" fill="#222"/>
+    <path d="M70 338h62" stroke-width="2"/>
+    <!-- 하체: 바지 허리 -->
+    <path d="M78 226h46l2 16H76z" fill="#4a4f5a"/>
+    <!-- 왼팔: 책을 든 팔 (재킷 소매) -->
+    ${limb("M72 146L54 190L56 218", "#d9dbe0")}
+    <circle cx="56" cy="224" r="7"/>
+    <rect x="38" y="220" width="26" height="32" rx="2" fill="#f6e97f" transform="rotate(-8 51 236)"/><path d="M44 228h14M44 234h14" transform="rotate(-8 51 236)"/>
+    <!-- 오른팔: 지시봉을 든 팔 -->
+    ${limb("M128 146L152 128L166 102", "#d9dbe0")}
+    <circle cx="168" cy="96" r="7"/>
+    <path d="M171 90l30-54" stroke-width="3.4"/><circle cx="202" cy="34" r="3" fill="#222"/>
+    <!-- 상체: 재킷 + 셔츠 + 넥타이 -->
+    <path d="M72 138q29-12 58 0l4 94H68z" fill="#d9dbe0"/>
+    <path d="M90 130l11 34 11-34z"/>
+    <path d="M101 140l-5 8 5 24 5-24z" fill="#f6e97f"/>
+    <path d="M90 130l-6 18 10 4-4 10M112 130l6 18-10 4 4 10" fill="none"/>
+    <path d="M101 172v58" fill="none"/><circle cx="105" cy="190" r="2" fill="#222"/><circle cx="105" cy="208" r="2" fill="#222"/>
+    <path d="M116 176h10" fill="none"/>
+    <!-- 목 + 머리 -->
+    <path d="M94 116v16h14v-16"/>
+    <circle cx="101" cy="92" r="27"/>
+    <path d="M74 88c0-22 12-34 28-34s28 12 28 32c-7-5-10-12-12-17-12 9-29 14-44 19z" fill="#222"/>
+    <circle cx="91" cy="97" r="8"/><circle cx="112" cy="97" r="8"/><path d="M99 97h5M74 95h9M120 95h9" fill="none"/>
+    <circle cx="91" cy="97" r="2" fill="#222"/><circle cx="112" cy="97" r="2" fill="#222"/><path d="M95 110q6 4 12 0" fill="none"/>
+  </svg>`; })(),
 };
 
 // ---------------------------------------------------------------- 첫 화면: 엑셀 두 종류 첨부
