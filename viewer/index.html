@@ -136,13 +136,14 @@ table.it{width:100%;border-collapse:collapse}
 .home .btn.ghost{background:#fff;color:#1f1f1f}
 .home .btn.big{background:#1f1f1f}
 .skyline{position:absolute;left:0;right:0;bottom:0;height:170px;z-index:1;pointer-events:none;display:flex;flex-direction:column}
-.skyline svg{width:100%;height:150px;display:block}
+.skyline .city{height:150px;padding:0 236px}  /* 양옆은 학생·선생님 자리: 건물과 겹치지 않게 비운다 */
+.skyline .city svg{width:100%;height:100%;display:block}
 .skyline .ground{height:20px;background:#efefef;border-top:2px solid #222}
 .person{position:absolute;bottom:20px;width:210px;z-index:4;pointer-events:none}
-.person.left{left:max(8px,calc(50% - 760px))}
-.person.right{right:max(8px,calc(50% - 760px))}
-@media (max-width:1380px){.person{width:150px}}
-@media (max-width:1180px){.person{display:none}}
+.person.left{left:12px}
+.person.right{right:12px}
+@media (max-width:1380px){.person{width:150px}.skyline .city{padding:0 172px}}
+@media (max-width:1180px){.person{display:none}.skyline .city{padding:0}}
 @media (max-width:700px){.home .hero h1{font-size:28px}.home .screen{padding:18px 14px}.home .spark{display:none}}
 .logo{width:22px;height:22px;flex:none}
 @media print{.resizer,aside,header .chips{display:none}}
@@ -154,7 +155,7 @@ table.it{width:100%;border-collapse:collapse}
 <script>
 // 파이썬(compare.py)이 비교 결과를 아래 자리에 넣는다. 비어 있으면 결과 파일(.json)을 불러오는 화면이 나온다.
 const EMBEDDED = /*__DATA__*/null;
-const APP_VERSION = "1.5.2";  // 화면에 표시해 최신판인지 확인할 수 있게 한다
+const APP_VERSION = "1.5.3";  // 화면에 표시해 최신판인지 확인할 수 있게 한다
 
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
@@ -485,7 +486,7 @@ const ART = {
       return s;
     };
     const tree = (x, r) => `<path d="M${x} 150v-${r + 8}" stroke-width="3"/><circle cx="${x}" cy="${150 - r - 22}" r="${r}" fill="#b5e061"/><circle cx="${x + r * .7}" cy="${150 - r - 12}" r="${r * .75}" fill="#b5e061"/>`;
-    return `<svg viewBox="0 0 1400 150" preserveAspectRatio="xMidYMax meet" fill="#fff" stroke="#222" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    return `<svg viewBox="0 0 1400 150" preserveAspectRatio="xMidYMax meet" fill="#fff" stroke="#222" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><g id="city">
       <rect x="30" y="70" width="64" height="80"/>${W(44, 84, 2, 2)}
       <rect x="104" y="40" width="58" height="110"/>${W(116, 56, 2, 3, 22, 28)}
       <rect x="172" y="92" width="80" height="58"/>${W(186, 106, 3, 1)}
@@ -506,7 +507,7 @@ const ART = {
       <rect x="1140" y="52" width="60" height="98"/>${W(1153, 68, 2, 3, 22, 26)}
       <rect x="1210" y="90" width="84" height="60"/>${W(1224, 104, 3, 1, 22)}
       <rect x="1304" y="64" width="58" height="86"/>${W(1317, 80, 2, 2, 22, 30)}
-    </svg>`;
+    </g></svg>`;
   },
   // 학생: 교복(흰 셔츠·리본·남색 반바지), 가방, 운동화. 머리·목·상체·팔·하체·다리를 따로 그린다.
   student: (() => {
@@ -630,7 +631,7 @@ function renderDrop() {
     </div>
     <div class="rod bottom"></div>
     </div>
-    <div class="skyline">${ART.skyline()}<div class="ground"></div></div>
+    <div class="skyline"><div class="city">${ART.skyline()}</div><div class="ground"></div></div>
     <div class="person left">${ART.student}</div>
     <div class="person right">${ART.teacher}</div>
     <input type="file" id="f-school" accept=".xlsx,.xlsm" multiple hidden>
